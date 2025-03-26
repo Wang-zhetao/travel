@@ -19,44 +19,90 @@ struct RouteMapView: View {
     
     var body: some View {
         ZStack {
-            Map(coordinateRegion: .constant(region), 
-                interactionModes: .all,
-                showsUserLocation: true,
-                userTrackingMode: nil,
-                annotationItems: locations) { location in
-                MapAnnotation(coordinate: location.coordinate) {
-                    VStack {
-                        ZStack {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 40, height: 40)
-                                .shadow(radius: 2)
-                            
-                            if let iconProvider = iconForType, let colorProvider = colorForType {
-                                Image(systemName: iconProvider(location.type))
-                                    .font(.system(size: 20))
-                                    .foregroundColor(colorProvider(location.type))
-                            } else {
-                                Image(systemName: "mappin")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.red)
+            // 使用新的iOS 17 Map API
+            if #available(iOS 17.0, *) {
+                Map(position: Binding.constant(MapCameraPosition.region(region))) {
+                    ForEach(locations) { location in
+                        Annotation(
+                            location.name,
+                            coordinate: location.coordinate,
+                            anchor: .bottom
+                        ) {
+                            VStack {
+                                ZStack {
+                                    Circle()
+                                        .fill(.white)
+                                        .frame(width: 40, height: 40)
+                                        .shadow(radius: 2)
+                                    
+                                    if let iconProvider = iconForType, let colorProvider = colorForType {
+                                        Image(systemName: iconProvider(location.type))
+                                            .font(.system(size: 20))
+                                            .foregroundColor(colorProvider(location.type))
+                                    } else {
+                                        Image(systemName: "mappin")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                                
+                                Text(location.name)
+                                    .font(.caption)
+                                    .padding(4)
+                                    .background(.white.opacity(0.8))
+                                    .cornerRadius(4)
+                            }
+                            .onTapGesture {
+                                annotationTapAction?(location)
                             }
                         }
-                        
-                        Text(location.name)
-                            .font(.caption)
-                            .padding(4)
-                            .background(.white.opacity(0.8))
-                            .cornerRadius(4)
-                    }
-                    .onTapGesture {
-                        annotationTapAction?(location)
                     }
                 }
-            }
-            .mapStyle(mapType == .standard ? .standard : .hybrid)
-            .onTapGesture { _ in
-                tapAction?(region.center)
+                .mapStyle(mapType == .standard ? .standard : .hybrid)
+                .onTapGesture { _ in
+                    tapAction?(region.center)
+                }
+            } else {
+                // 兼容iOS 16及更早版本
+                Map(coordinateRegion: .constant(region), 
+                    interactionModes: .all,
+                    showsUserLocation: true,
+                    userTrackingMode: nil,
+                    annotationItems: locations) { location in
+                    MapAnnotation(coordinate: location.coordinate) {
+                        VStack {
+                            ZStack {
+                                Circle()
+                                    .fill(.white)
+                                    .frame(width: 40, height: 40)
+                                    .shadow(radius: 2)
+                                
+                                if let iconProvider = iconForType, let colorProvider = colorForType {
+                                    Image(systemName: iconProvider(location.type))
+                                        .font(.system(size: 20))
+                                        .foregroundColor(colorProvider(location.type))
+                                } else {
+                                    Image(systemName: "mappin")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            
+                            Text(location.name)
+                                .font(.caption)
+                                .padding(4)
+                                .background(.white.opacity(0.8))
+                                .cornerRadius(4)
+                        }
+                        .onTapGesture {
+                            annotationTapAction?(location)
+                        }
+                    }
+                }
+                .mapStyle(mapType == .standard ? .standard : .hybrid)
+                .onTapGesture { _ in
+                    tapAction?(region.center)
+                }
             }
             
             // 如果有路线，绘制连接线
@@ -97,7 +143,7 @@ struct RouteLineView: View {
                 .stroke(travelMode.color, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round, dash: [5, 5]))
                 
                 // 路线点
-                ForEach(0..<locations.count) { i in
+                ForEach(0..<locations.count, id: \.self) { i in
                     Circle()
                         .fill(travelMode.color)
                         .frame(width: 10, height: 10)
@@ -106,7 +152,7 @@ struct RouteLineView: View {
                 
                 // 添加路线中间的交通模式图标
                 if locations.count > 1 {
-                    ForEach(0..<locations.count-1, id: \.self) { index in
+                    ForEach(0..<(locations.count-1), id: \.self) { index in
                         let startPoint = point(for: locations[index].coordinate, in: geometry)
                         let endPoint = point(for: locations[index+1].coordinate, in: geometry)
                         let midPoint = CGPoint(
@@ -191,67 +237,136 @@ struct ExploreRouteMapView: View {
     
     var body: some View {
         VStack {
-            Map(coordinateRegion: $region, annotationItems: sampleLocations) { location in
-                MapAnnotation(coordinate: location.coordinate) {
+            // 使用新的iOS 17 Map API
+            if #available(iOS 17.0, *) {
+                Map(position: Binding.constant(MapCameraPosition.region(region))) {
+                    ForEach(sampleLocations) { location in
+                        Annotation(
+                            location.name,
+                            coordinate: location.coordinate,
+                            anchor: .bottom
+                        ) {
+                            VStack {
+                                ZStack {
+                                    Circle()
+                                        .fill(.white)
+                                        .frame(width: 40, height: 40)
+                                        .shadow(radius: 2)
+                                    
+                                    Image(systemName: iconForType(location.type))
+                                        .font(.system(size: 20))
+                                        .foregroundColor(colorForType(location.type))
+                                }
+                                
+                                Text(location.name)
+                                    .font(.caption)
+                                    .padding(4)
+                                    .background(.white.opacity(0.8))
+                                    .cornerRadius(4)
+                            }
+                        }
+                    }
+                }
+                .overlay(
                     VStack {
-                        ZStack {
-                            Circle()
-                                .fill(.white)
-                                .frame(width: 40, height: 40)
-                                .shadow(radius: 2)
+                        Spacer()
+                        
+                        // 底部信息面板
+                        VStack(spacing: 12) {
+                            Text("探索旅行路线")
+                                .font(.headline)
+                                .padding(.top, 8)
                             
-                            Image(systemName: iconForType(location.type))
-                                .font(.system(size: 20))
-                                .foregroundColor(colorForType(location.type))
-                        }
-                        
-                        Text(location.name)
-                            .font(.caption)
-                            .padding(4)
-                            .background(.white.opacity(0.8))
-                            .cornerRadius(4)
-                    }
-                    .onTapGesture {
-                        // 点击标记的动作
-                    }
-                }
-            }
-            .overlay(
-                VStack {
-                    Spacer()
-                    
-                    // 底部信息面板
-                    VStack(spacing: 12) {
-                        Text("探索旅行路线")
-                            .font(.headline)
-                            .padding(.top, 8)
-                        
-                        Text("开始规划您的完美旅程")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                            Text("开始规划您的完美旅程")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Button(action: {
+                                // 在此处添加开始规划的动作
+                            }) {
+                                Text("开始规划")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue)
+                                    .cornerRadius(10)
+                            }
                             .padding(.horizontal)
-                        
-                        Button(action: {
-                            // 在此处添加开始规划的动作
-                        }) {
-                            Text("开始规划")
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.blue)
-                                .cornerRadius(10)
+                            .padding(.bottom, 12)
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 12)
+                        .background(Color(UIColor.systemBackground))
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
+                        .padding()
                     }
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(15)
-                    .shadow(radius: 5)
-                    .padding()
+                )
+            } else {
+                // 兼容iOS 16及更早版本
+                Map(coordinateRegion: $region, annotationItems: sampleLocations) { location in
+                    MapAnnotation(coordinate: location.coordinate) {
+                        VStack {
+                            ZStack {
+                                Circle()
+                                    .fill(.white)
+                                    .frame(width: 40, height: 40)
+                                    .shadow(radius: 2)
+                                
+                                Image(systemName: iconForType(location.type))
+                                    .font(.system(size: 20))
+                                    .foregroundColor(colorForType(location.type))
+                            }
+                            
+                            Text(location.name)
+                                .font(.caption)
+                                .padding(4)
+                                .background(.white.opacity(0.8))
+                                .cornerRadius(4)
+                        }
+                        .onTapGesture {
+                            // 点击标记的动作
+                        }
+                    }
                 }
-            )
+                .overlay(
+                    VStack {
+                        Spacer()
+                        
+                        // 底部信息面板
+                        VStack(spacing: 12) {
+                            Text("探索旅行路线")
+                                .font(.headline)
+                                .padding(.top, 8)
+                            
+                            Text("开始规划您的完美旅程")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Button(action: {
+                                // 在此处添加开始规划的动作
+                            }) {
+                                Text("开始规划")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue)
+                                    .cornerRadius(10)
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 12)
+                        }
+                        .background(Color(UIColor.systemBackground))
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
+                        .padding()
+                    }
+                )
+            }
         }
         .navigationTitle("行程规划")
     }

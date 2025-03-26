@@ -4,6 +4,7 @@
   
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-iOS-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-brightgreen.svg)
 
 </div>
 
@@ -34,6 +35,13 @@
 - 从小红书App直接分享导入
 - 导入历史记录管理
 
+### 🗺️ 行程规划
+- **自动生成最优旅行路线**
+- 地图可视化展示行程路线
+- 支持自定义添加地点
+- 显示景点信息和推荐游玩时长
+- 路线总览与时间规划
+
 ### 👤 个人中心
 - 个人收藏管理
 - 已导入攻略查看
@@ -42,6 +50,7 @@
 ## 🛠 技术特点
 
 - 基于最新Swift和SwiftUI开发
+- 集成MapKit实现地图和路线功能
 - 采用模块化架构设计
 - 流畅的UI/UX体验
 - SF Symbols和渐变色设计
@@ -65,14 +74,30 @@
 - [ ] 实现真实API集成，连接小红书平台
 - [ ] 添加离线缓存功能
 - [ ] 支持更多社交平台导入
-- [ ] 增加地图导航功能
+- [ ] 优化路线规划算法，考虑交通时间和拥堵情况
+- [ ] 添加路线导航和语音指引
+- [ ] 支持路线分享与协作编辑
 - [ ] 添加评论和评分系统
-- [ ] 需要根据行程自动生成线路图
-- [ ] 地点之间显示交通方式
 
+## 📄 许可证
+
+本项目采用MIT许可证 - 详情请查看[LICENSE](LICENSE)文件
 
 ## 👥 贡献指南
 
 欢迎提交问题和功能请求！如果您想为项目做出贡献，请先查看我们的贡献指南。
+
+## 📞 联系方式
+
+如有任何问题或建议，请通过以下方式联系我们：
+
+- Email: yourname@example.com
+- GitHub: [your-github-username](https://github.com/your-github-username)
+
+---
+
+<div align="center">
+  <sub>用❤️打造 | 2025年</sub>
+</div>
 
 

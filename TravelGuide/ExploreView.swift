@@ -20,7 +20,8 @@ struct ExploreView: View {
         Category(name: "景点", icon: "mountain.2.fill"),
         Category(name: "购物", icon: "bag.fill"),
         Category(name: "交通", icon: "car.fill"),
-        Category(name: "实用信息", icon: "info.circle.fill")
+        Category(name: "实用信息", icon: "info.circle.fill"),
+        Category(name: "行程规划", icon: "map.fill")
     ]
     
     let destinations = [
@@ -50,18 +51,24 @@ struct ExploreView: View {
                         GridItem(.flexible())
                     ], spacing: 20) {
                         ForEach(categories) { category in
-                            VStack {
-                                Circle()
-                                    .fill(Color.orange.opacity(0.2))
-                                    .frame(width: 60, height: 60)
-                                    .overlay(
-                                        Image(systemName: category.icon)
-                                            .font(.title2)
-                                            .foregroundColor(.orange)
-                                    )
-                                Text(category.name)
-                                    .font(.caption)
-                            }
+                            NavigationLink(
+                                destination: destinationView(for: category),
+                                label: {
+                                    VStack {
+                                        Circle()
+                                            .fill(category.name == "行程规划" ? Color.orange.opacity(0.2) : Color.gray.opacity(0.2))
+                                            .frame(width: 60, height: 60)
+                                            .overlay(
+                                                Image(systemName: category.icon)
+                                                    .font(.title2)
+                                                    .foregroundColor(category.name == "行程规划" ? .orange : .gray)
+                                            )
+                                        Text(category.name)
+                                            .font(.caption)
+                                            .foregroundColor(.primary)
+                                    }
+                                }
+                            )
                         }
                     }
                     .padding(.horizontal)
@@ -173,6 +180,16 @@ struct ExploreView: View {
             }
             .navigationTitle("发现")
             .searchable(text: $searchText, prompt: "搜索目的地或旅游灵感")
+        }
+    }
+    
+    @ViewBuilder
+    private func destinationView(for category: Category) -> some View {
+        if category.name == "行程规划" {
+            RouteMapView()
+        } else {
+            Text(category.name)
+                .navigationTitle(category.name)
         }
     }
     

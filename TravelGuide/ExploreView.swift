@@ -29,6 +29,14 @@ struct ExploreView: View {
         "首尔", "香港", "巴厘岛", "马尔代夫", "普吉岛"
     ]
     
+    let inspirations = [
+        "探索东京迷人的文化景点",
+        "巴黎必去的10个小众景点",
+        "纽约最值得品尝的美食",
+        "伦敦博物馆一日游攻略",
+        "曼谷水上市场完全指南"
+    ]
+    
     @State private var searchText = ""
     
     var body: some View {
@@ -69,20 +77,28 @@ struct ExploreView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(destinations, id: \.self) { destination in
-                                VStack {
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.2))
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(LinearGradient(
+                                            gradient: Gradient(colors: [colorForDestination(destination), colorForDestination(destination).opacity(0.7)]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
                                         .frame(width: 120, height: 160)
-                                        .cornerRadius(8)
-                                        .overlay(
-                                            Text(destination)
-                                                .foregroundColor(.white)
-                                                .fontWeight(.bold)
-                                                .padding(6)
-                                                .background(Color.black.opacity(0.6))
-                                                .cornerRadius(4),
-                                            alignment: .bottom
-                                        )
+                                    
+                                    Image(systemName: iconForDestination(destination))
+                                        .font(.system(size: 30))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .offset(y: -20)
+                                    
+                                    Text(destination)
+                                        .foregroundColor(.white)
+                                        .fontWeight(.bold)
+                                        .padding(6)
+                                        .background(Color.black.opacity(0.6))
+                                        .cornerRadius(4)
+                                        .frame(maxWidth: 120, maxHeight: 160, alignment: .bottom)
+                                        .padding(.bottom, 10)
                                 }
                             }
                         }
@@ -98,15 +114,27 @@ struct ExploreView: View {
                         .padding(.horizontal)
                     
                     VStack(spacing: 15) {
-                        ForEach(1...5, id: \.self) { _ in
+                        ForEach(0..<inspirations.count, id: \.self) { index in
                             HStack(alignment: .top, spacing: 12) {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 100, height: 100)
-                                    .cornerRadius(8)
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                Color(hue: Double(index) * 0.15, saturation: 0.7, brightness: 0.9),
+                                                Color(hue: Double(index) * 0.15, saturation: 0.5, brightness: 0.7)
+                                            ]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
+                                        .frame(width: 100, height: 100)
+                                    
+                                    Image(systemName: inspirationIcons[index % inspirationIcons.count])
+                                        .font(.system(size: 36))
+                                        .foregroundColor(.white)
+                                }
                                 
                                 VStack(alignment: .leading, spacing: 5) {
-                                    Text("旅行灵感标题")
+                                    Text(inspirations[index])
                                         .font(.headline)
                                         .lineLimit(2)
                                     
@@ -130,7 +158,7 @@ struct ExploreView: View {
                                         Image(systemName: "heart")
                                             .foregroundColor(.gray)
                                         
-                                        Text("256")
+                                        Text("\(256 + index * 47)")
                                             .font(.caption)
                                             .foregroundColor(.gray)
                                     }
@@ -147,6 +175,90 @@ struct ExploreView: View {
             .searchable(text: $searchText, prompt: "搜索目的地或旅游灵感")
         }
     }
+    
+    // 根据目的地返回不同的颜色
+    private func colorForDestination(_ destination: String) -> Color {
+        switch destination {
+        case "东京":
+            return Color.red
+        case "巴黎":
+            return Color.blue
+        case "纽约":
+            return Color.purple
+        case "伦敦":
+            return Color(red: 0.0, green: 0.3, blue: 0.6)
+        case "北京":
+            return Color.red.opacity(0.8)
+        case "曼谷":
+            return Color.green
+        case "新加坡":
+            return Color(red: 0.8, green: 0.2, blue: 0.3)
+        case "悉尼":
+            return Color(red: 0.0, green: 0.5, blue: 0.8)
+        case "罗马":
+            return Color(red: 0.8, green: 0.6, blue: 0.0)
+        case "迪拜":
+            return Color(red: 0.9, green: 0.7, blue: 0.0)
+        case "首尔":
+            return Color(red: 0.5, green: 0.0, blue: 0.9)
+        case "香港":
+            return Color(red: 0.9, green: 0.0, blue: 0.3)
+        case "巴厘岛":
+            return Color(red: 0.0, green: 0.7, blue: 0.5)
+        case "马尔代夫":
+            return Color(red: 0.0, green: 0.8, blue: 0.9)
+        case "普吉岛":
+            return Color(red: 0.0, green: 0.6, blue: 0.4)
+        default:
+            return Color.orange
+        }
+    }
+    
+    // 根据目的地返回不同的图标
+    private func iconForDestination(_ destination: String) -> String {
+        switch destination {
+        case "东京":
+            return "building.2.fill"
+        case "巴黎":
+            return "building.columns.fill"
+        case "纽约":
+            return "building.fill"
+        case "伦敦":
+            return "clock.fill"
+        case "北京":
+            return "house.fill"
+        case "曼谷":
+            return "leaf.fill"
+        case "新加坡":
+            return "helm"
+        case "悉尼":
+            return "sun.max.fill"
+        case "罗马":
+            return "crown.fill"
+        case "迪拜":
+            return "building.columns.circle.fill"
+        case "首尔":
+            return "camera.macro"
+        case "香港":
+            return "sparkles"
+        case "巴厘岛", "马尔代夫", "普吉岛":
+            return "water.waves"
+        default:
+            return "map.fill"
+        }
+    }
+    
+    // 旅游灵感图标集合
+    private let inspirationIcons = [
+        "camera.fill",
+        "fork.knife",
+        "building.2.fill",
+        "bicycle",
+        "bag.fill",
+        "figure.hiking",
+        "mountain.2.fill",
+        "beach.umbrella.fill"
+    ]
 }
 
 #Preview {

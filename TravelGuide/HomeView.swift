@@ -36,15 +36,12 @@ struct HomeView: View {
                     
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 15) {
-                            ForEach(["日本", "泰国", "法国", "意大利", "美国", "澳大利亚"], id: \.self) { destination in
-                                VStack {
-                                    Circle()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(width: 70, height: 70)
-                                    Text(destination)
-                                        .font(.caption)
-                                }
-                            }
+                            DestinationCircle(name: "日本", icon: "building.2.fill", color: .red)
+                            DestinationCircle(name: "泰国", icon: "leaf.fill", color: .green)
+                            DestinationCircle(name: "法国", icon: "building.columns.fill", color: .blue)
+                            DestinationCircle(name: "意大利", icon: "cup.and.saucer.fill", color: .orange)
+                            DestinationCircle(name: "美国", icon: "star.fill", color: .purple)
+                            DestinationCircle(name: "澳大利亚", icon: "fish.fill", color: .teal)
                         }
                         .padding(.horizontal)
                     }
@@ -71,18 +68,33 @@ struct GuideCard: View {
     
     var body: some View {
         VStack(alignment: .leading) {
-            Rectangle()
-                .fill(Color.gray.opacity(0.2))
-                .aspectRatio(1.5, contentMode: .fit)
-                .overlay(
-                    Text(guide.destination)
-                        .font(.caption)
-                        .padding(6)
-                        .background(Color.black.opacity(0.6))
-                        .foregroundColor(.white)
-                        .cornerRadius(4),
-                    alignment: .topLeading
+            ZStack {
+                // 渐变色背景代替图片
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        colorForDestination(guide.destination),
+                        colorForDestination(guide.destination).opacity(0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
+                .aspectRatio(1.5, contentMode: .fit)
+                
+                // 添加图标
+                Image(systemName: iconForDestination(guide.destination))
+                    .font(.system(size: 36))
+                    .foregroundColor(.white)
+                
+                // 目的地标签
+                Text(guide.destination)
+                    .font(.caption)
+                    .padding(6)
+                    .background(Color.black.opacity(0.6))
+                    .foregroundColor(.white)
+                    .cornerRadius(4)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(8)
+            }
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(guide.title)
@@ -112,6 +124,65 @@ struct GuideCard: View {
         .cornerRadius(10)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
+    }
+    
+    // 根据目的地返回不同的颜色
+    private func colorForDestination(_ destination: String) -> Color {
+        switch destination {
+        case _ where destination.contains("东京"):
+            return Color.red
+        case _ where destination.contains("巴黎"):
+            return Color.blue
+        case _ where destination.contains("纽约"):
+            return Color.purple
+        case _ where destination.contains("泰国"):
+            return Color.green
+        default:
+            return Color.orange
+        }
+    }
+    
+    // 根据目的地返回不同的图标
+    private func iconForDestination(_ destination: String) -> String {
+        switch destination {
+        case _ where destination.contains("东京"):
+            return "building.2.fill"
+        case _ where destination.contains("巴黎"):
+            return "building.columns.fill"
+        case _ where destination.contains("纽约"):
+            return "building.fill"
+        case _ where destination.contains("泰国"):
+            return "leaf.fill"
+        default:
+            return "map.fill"
+        }
+    }
+}
+
+struct DestinationCircle: View {
+    let name: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        gradient: Gradient(colors: [color, color.opacity(0.7)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 70, height: 70)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 30))
+                    .foregroundColor(.white)
+            }
+            
+            Text(name)
+                .font(.caption)
+        }
     }
 }
 

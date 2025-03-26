@@ -37,11 +37,35 @@ struct HomeView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 15) {
                             DestinationCircle(name: "日本", icon: "building.2.fill", color: .red)
+                                .onTapGesture {
+                                    // 处理点击日本目的地
+                                    print("点击了日本目的地")
+                                }
                             DestinationCircle(name: "泰国", icon: "leaf.fill", color: .green)
+                                .onTapGesture {
+                                    // 处理点击泰国目的地
+                                    print("点击了泰国目的地")
+                                }
                             DestinationCircle(name: "法国", icon: "building.columns.fill", color: .blue)
+                                .onTapGesture {
+                                    // 处理点击法国目的地
+                                    print("点击了法国目的地")
+                                }
                             DestinationCircle(name: "意大利", icon: "cup.and.saucer.fill", color: .orange)
+                                .onTapGesture {
+                                    // 处理点击意大利目的地
+                                    print("点击了意大利目的地")
+                                }
                             DestinationCircle(name: "美国", icon: "star.fill", color: .purple)
+                                .onTapGesture {
+                                    // 处理点击美国目的地
+                                    print("点击了美国目的地")
+                                }
                             DestinationCircle(name: "澳大利亚", icon: "fish.fill", color: .teal)
+                                .onTapGesture {
+                                    // 处理点击澳大利亚目的地
+                                    print("点击了澳大利亚目的地")
+                                }
                         }
                         .padding(.horizontal)
                     }
@@ -52,7 +76,10 @@ struct HomeView: View {
                         .padding(.top)
                     
                     ForEach(guides) { guide in
-                        GuideCard(guide: guide)
+                        NavigationLink(destination: GuideDetailView(guide: guide)) {
+                            GuideCard(guide: guide)
+                        }
+                        .buttonStyle(PlainButtonStyle()) // 保持卡片原有样式
                     }
                 }
                 .padding(.top)

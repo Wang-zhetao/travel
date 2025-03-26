@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MapKit
 
 struct Category: Identifiable {
     let id = UUID()
@@ -186,7 +187,7 @@ struct ExploreView: View {
     @ViewBuilder
     private func destinationView(for category: Category) -> some View {
         if category.name == "行程规划" {
-            RouteMapView()
+            ExploreRouteMapView()
         } else {
             Text(category.name)
                 .navigationTitle(category.name)

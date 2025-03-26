@@ -1,0 +1,957 @@
+//
+//  SmartTravelVisualizationSystem.swift
+//  TravelGuide
+//
+//  Created by zhetao Wang on 2025/3/26.
+//
+
+import SwiftUI
+import MapKit
+
+// 地点模型
+struct Location: Identifiable {
+    let id = UUID()
+    let name: String
+    let coordinate: CLLocationCoordinate2D
+    let type: LocationType
+    let timeSpent: TimeInterval // 预计停留时间（秒）
+    let openingHours: String
+    var notes: String = ""
+    var address: String = ""
+    var cost: Double = 0 // 消费预算
+    var priority: Int = 2 // 优先级 1-3，1最高
+    
+    enum LocationType {
+        case attraction
+        case restaurant
+        case hotel
+        case transport
+        case business
+        case shopping
+    }
+}
+
+// 交通方式模型
+struct TravelMode: Identifiable {
+    let id = UUID()
+    let name: String
+    let icon: String
+    let color: Color
+    let speedFactor: Double // 速度因子，影响路线规划
+    let costPerKm: Double // 每公里成本
+    let carbonFootprint: Double // 碳足迹指数
+    let comfortLevel: Int // 舒适度 1-5, 5最舒适
+    
+    // 交通方式预设
+    static let walking = TravelMode(
+        name: "步行", 
+        icon: "figure.walk", 
+        color: .green, 
+        speedFactor: 1.0, 
+        costPerKm: 0, 
+        carbonFootprint: 0, 
+        comfortLevel: 3
+    )
+    static let publicTransport = TravelMode(
+        name: "公共交通", 
+        icon: "tram.fill", 
+        color: .blue, 
+        speedFactor: 3.0, 
+        costPerKm: 0.5, 
+        carbonFootprint: 0.3, 
+        comfortLevel: 2
+    )
+    static let taxi = TravelMode(
+        name: "出租车", 
+        icon: "car.fill", 
+        color: .orange, 
+        speedFactor: 4.0, 
+        costPerKm: 2.5, 
+        carbonFootprint: 0.7, 
+        comfortLevel: 4
+    )
+    static let bicycle = TravelMode(
+        name: "自行车", 
+        icon: "bicycle", 
+        color: .teal, 
+        speedFactor: 2.0, 
+        costPerKm: 0.1, 
+        carbonFootprint: 0.1, 
+        comfortLevel: 3
+    )
+    static let highSpeedRail = TravelMode(
+        name: "高铁", 
+        icon: "tram", 
+        color: .red, 
+        speedFactor: 15.0, 
+        costPerKm: 0.5, 
+        carbonFootprint: 0.2, 
+        comfortLevel: 4
+    )
+    static let flight = TravelMode(
+        name: "飞机", 
+        icon: "airplane", 
+        color: .purple, 
+        speedFactor: 25.0, 
+        costPerKm: 1.2, 
+        carbonFootprint: 1.0, 
+        comfortLevel: 3
+    )
+    
+    static let localModes = [walking, publicTransport, taxi, bicycle]
+    static let longDistanceModes = [highSpeedRail, flight]
+    static let allModes = localModes + longDistanceModes
+}
+
+// 行程模型
+struct TravelItinerary: Identifiable {
+    let id = UUID()
+    let name: String
+    var startDate: Date
+    var endDate: Date
+    var locations: [ItineraryLocation]
+    var totalBudget: Double
+    var optimizationPreference: OptimizationPreference
+    
+    enum OptimizationPreference {
+        case timeEfficient // 时间最短
+        case costEffective // 成本最低
+        case experienceOptimal // 体验最佳
+        case balanced // 平衡模式
+    }
+}
+
+// 行程中的地点，包含前后交通衔接信息
+struct ItineraryLocation: Identifiable {
+    let id = UUID()
+    var location: Location
+    var plannedArrivalTime: Date
+    var plannedDepartureTime: Date
+    var transportToHere: TransportSegment?
+    var transportFromHere: TransportSegment?
+    var status: VisitStatus = .planned
+    
+    enum VisitStatus {
+        case planned
+        case visited
+        case skipped
+        case delayed
+    }
+}
+
+// 交通段落
+struct TransportSegment: Identifiable {
+    let id = UUID()
+    var mode: TravelMode
+    var startLocation: Location
+    var endLocation: Location
+    var distance: Double // 公里
+    var estimatedDuration: TimeInterval // 预计耗时（秒）
+    var cost: Double // 预计花费
+    var departureTime: Date
+    var arrivalTime: Date
+    var trafficCondition: TrafficCondition = .normal
+    
+    enum TrafficCondition {
+        case light
+        case normal
+        case heavy
+        case severe
+    }
+}
+
+// 智能行程可视化系统主视图
+struct SmartTravelVisualizationSystem: View {
+    @State private var region = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503), // 东京
+        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+    )
+    
+    @State private var selectedLocation: Location?
+    @State private var showingLocationDetails = false
+    @State private var route: [Location] = []
+    @State private var mapType: MKMapType = .standard
+    @State private var showingAddLocationSheet = false
+    @State private var newLocationName = ""
+    @State private var newLocationType: Location.LocationType = .attraction
+    @State private var newLocationTime: Double = 1
+    @State private var tapLocation: CLLocationCoordinate2D?
+    @State private var selectedTravelMode: TravelMode = .publicTransport
+    @State private var showTravelModeSelection = false
+    @State private var totalTravelTime: TimeInterval = 0
+    @State private var totalDistance: Double = 0
+    @State private var showingRouteStats = false
+    @State private var optimizationMethod = 0 // 0: 最短路径, 1: 最少时间, 2: 平衡模式
+    
+    // 新增状态变量
+    @State private var viewMode: ViewMode = .map
+    @State private var currentItinerary: TravelItinerary?
+    @State private var itineraries: [TravelItinerary] = []
+    @State private var showingConflicts = false
+    @State private var conflicts: [TravelConflict] = []
+    @State private var weatherData: [String: WeatherInfo] = [:]
+    @State private var trafficData: [String: TrafficInfo] = [:]
+    @State private var selectedDate: Date = Date()
+    @State private var isShowingTimelineView = false
+    @State private var isLoadingData = false
+    @State private var optimizationPreference: TravelItinerary.OptimizationPreference = .balanced
+    
+    enum ViewMode {
+        case map
+        case timeline
+        case list
+        case statistics
+    }
+    
+    // 示例行程数据
+    let sampleLocations = [
+        Location(
+            name: "东京塔", 
+            coordinate: CLLocationCoordinate2D(latitude: 35.6586, longitude: 139.7454),
+            type: .attraction,
+            timeSpent: 7200, // 2小时
+            openingHours: "9:00-23:00",
+            notes: "东京地标，可以俯瞰全市美景",
+            address: "东京都港区芝公园4-2-8",
+            cost: 1000, // 日元
+            priority: 1
+        ),
+        Location(
+            name: "浅草寺",
+            coordinate: CLLocationCoordinate2D(latitude: 35.7147, longitude: 139.7966),
+            type: .attraction,
+            timeSpent: 5400, // 1.5小时
+            openingHours: "6:00-17:00",
+            notes: "东京最古老的寺庙，体验传统日本文化",
+            address: "东京都台东区浅草2-3-1",
+            cost: 0, // 免费
+            priority: 1
+        ),
+        Location(
+            name: "寿司大", 
+            coordinate: CLLocationCoordinate2D(latitude: 35.6954, longitude: 139.7019),
+            type: .restaurant,
+            timeSpent: 3600, // 1小时
+            openingHours: "11:00-22:00",
+            notes: "顶级寿司店，需提前预约",
+            address: "东京都中央区银座4-2-15",
+            cost: 12000, // 日元
+            priority: 2
+        )
+    ]
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Map(coordinateRegion: $region, 
+                    interactionModes: .all,
+                    showsUserLocation: true,
+                    userTrackingMode: nil,
+                    annotationItems: route.isEmpty ? sampleLocations : route) { location in
+                    MapAnnotation(coordinate: location.coordinate) {
+                        VStack {
+                            ZStack {
+                                Circle()
+                                    .fill(.white)
+                                    .frame(width: 40, height: 40)
+                                    .shadow(radius: 2)
+                                
+                                Image(systemName: iconForType(location.type))
+                                    .font(.system(size: 20))
+                                    .foregroundColor(colorForType(location.type))
+                            }
+                            
+                            Text(location.name)
+                                .font(.caption)
+                                .padding(4)
+                                .background(.white.opacity(0.8))
+                                .cornerRadius(4)
+                        }
+                        .onTapGesture {
+                            selectedLocation = location
+                            showingLocationDetails = true
+                        }
+                    }
+                }
+                .mapStyle(.standard)
+                .onTapGesture(count: 2) { location in
+                    // 使用双击代替长按来添加地点
+                    showingAddLocationSheet = true
+                    
+                    // 简单方法：将点击位置设为地图中心点
+                    tapLocation = region.center
+                }
+                
+                // 如果有路线，绘制连接线
+                if !route.isEmpty {
+                    // 绘制路线连接线
+                    RouteLineView(locations: route, travelMode: selectedTravelMode)
+                }
+                
+                VStack {
+                    HStack {
+                        // 左侧控制按钮
+                        VStack(spacing: 10) {
+                            Button(action: {
+                                withAnimation {
+                                    showTravelModeSelection.toggle()
+                                }
+                            }) {
+                                Image(systemName: selectedTravelMode.icon)
+                                    .padding(8)
+                                    .background(.white)
+                                    .foregroundColor(selectedTravelMode.color)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 2)
+                            }
+                            
+                            if !route.isEmpty {
+                                Button(action: {
+                                    showingRouteStats.toggle()
+                                }) {
+                                    Image(systemName: "info.circle")
+                                        .padding(8)
+                                        .background(.white)
+                                        .foregroundColor(.blue)
+                                        .clipShape(Circle())
+                                        .shadow(radius: 2)
+                                }
+                            }
+                        }
+                        .padding(.leading)
+                        .padding(.top)
+                        
+                        if showTravelModeSelection {
+                            HStack(spacing: 5) {
+                                ForEach(TravelMode.allModes) { mode in
+                                    Button(action: {
+                                        selectedTravelMode = mode
+                                        showTravelModeSelection = false
+                                        if !route.isEmpty {
+                                            recalculateRouteStats()
+                                        }
+                                    }) {
+                                        VStack {
+                                            Image(systemName: mode.icon)
+                                                .foregroundColor(mode.color)
+                                            Text(mode.name)
+                                                .font(.caption)
+                                                .foregroundColor(.primary)
+                                        }
+                                        .padding(8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(selectedTravelMode.id == mode.id ? mode.color.opacity(0.2) : Color.white)
+                                        )
+                                        .shadow(radius: 1)
+                                    }
+                                }
+                            }
+                            .padding(8)
+                            .background(Color.white.opacity(0.9))
+                            .cornerRadius(12)
+                            .shadow(radius: 2)
+                            .transition(.scale)
+                        }
+                        
+                        Spacer()
+                        
+                        // 右侧控制按钮
+                        VStack(spacing: 10) {
+                            Button(action: {
+                                mapType = mapType == .standard ? .hybrid : .standard
+                            }) {
+                                Image(systemName: mapType == .standard ? "globe" : "map")
+                                    .padding(8)
+                                    .background(.white)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 2)
+                            }
+                            
+                            Button(action: {
+                                // 添加当前位置
+                                if let userLocation = CLLocationManager().location?.coordinate {
+                                    tapLocation = userLocation
+                                    showingAddLocationSheet = true
+                                }
+                            }) {
+                                Image(systemName: "plus")
+                                    .padding(8)
+                                    .background(.white)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 2)
+                            }
+                        }
+                        .padding(.trailing)
+                        .padding(.top)
+                    }
+                    
+                    Spacer()
+                    
+                    if route.isEmpty {
+                        VStack(spacing: 10) {
+                            Picker("优化方式", selection: $optimizationMethod) {
+                                Text("最短路径").tag(0)
+                                Text("最省时间").tag(1)
+                                Text("平衡模式").tag(2)
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .padding(.horizontal)
+                            .background(Color.white.opacity(0.8))
+                            .cornerRadius(8)
+                            
+                            Button(action: generateOptimalRoute) {
+                                Text("生成最优路线")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .background(Color.orange)
+                                    .cornerRadius(10)
+                                    .shadow(radius: 3)
+                            }
+                        }
+                        .padding(.bottom)
+                        .padding(.horizontal)
+                        .background(Color.white.opacity(0.6))
+                        .cornerRadius(15)
+                        .padding(.bottom)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 15) {
+                                ForEach(Array(route.enumerated()), id: \.element.id) { index, location in
+                                    VStack(alignment: .leading) {
+                                        HStack {
+                                            Text("\(index + 1)")
+                                                .font(.caption)
+                                                .bold()
+                                                .padding(4)
+                                                .background(Circle().fill(Color.orange))
+                                                .foregroundColor(.white)
+                                            
+                                            Image(systemName: iconForType(location.type))
+                                                .foregroundColor(colorForType(location.type))
+                                            Text(location.name)
+                                                .font(.subheadline)
+                                        }
+                                        
+                                        HStack {
+                                            Text(formatDuration(location.timeSpent))
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                            
+                                            Spacer()
+                                            
+                                            if index < route.count - 1 {
+                                                Image(systemName: selectedTravelMode.icon)
+                                                    .font(.caption)
+                                                    .foregroundColor(selectedTravelMode.color)
+                                            }
+                                        }
+                                    }
+                                    .padding(8)
+                                    .background(Color.white)
+                                    .cornerRadius(8)
+                                    .shadow(radius: 2)
+                                }
+                            }
+                            .padding()
+                        }
+                        .background(Color.white.opacity(0.9))
+                    }
+                }
+                
+                // 路线统计浮窗
+                if showingRouteStats {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("行程统计")
+                                .font(.headline)
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                showingRouteStats = false
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("总行程距离")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                Text(String(format: "%.1f 公里", totalDistance))
+                                    .font(.title3)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .leading) {
+                                Text("总耗时")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                Text(formatDuration(totalTravelTime + route.reduce(0) { $0 + $1.timeSpent }))
+                                    .font(.title3)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text("交通方式")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            Image(systemName: selectedTravelMode.icon)
+                                .foregroundColor(selectedTravelMode.color)
+                            
+                            Text(selectedTravelMode.name)
+                        }
+                        
+                        HStack {
+                            Text("移动时间")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            Spacer()
+                            
+                            Text(formatDuration(totalTravelTime))
+                        }
+                        
+                        HStack {
+                            Text("停留时间")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            Spacer()
+                            
+                            Text(formatDuration(route.reduce(0) { $0 + $1.timeSpent }))
+                        }
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(12)
+                    .shadow(radius: 5)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .transition(.move(edge: .top))
+                    .zIndex(1)
+                }
+            }
+            .navigationTitle("行程路线")
+            .navigationBarItems(trailing: 
+                Button(action: resetRoute) {
+                    Image(systemName: "arrow.clockwise")
+                }
+            )
+            .sheet(isPresented: $showingLocationDetails) {
+                if let location = selectedLocation {
+                    LocationDetailView(location: location)
+                }
+            }
+            .sheet(isPresented: $showingAddLocationSheet) {
+                addLocationView
+            }
+        }
+    }
+    
+    private var addLocationView: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("地点信息")) {
+                    TextField("地点名称", text: $newLocationName)
+                    
+                    Picker("地点类型", selection: $newLocationType) {
+                        Text("景点").tag(Location.LocationType.attraction)
+                        Text("餐厅").tag(Location.LocationType.restaurant)
+                        Text("住宿").tag(Location.LocationType.hotel)
+                        Text("交通").tag(Location.LocationType.transport)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    
+                    Stepper("停留时间: \(String(format: "%.1f", newLocationTime)) 小时", value: $newLocationTime, in: 0.5...8, step: 0.5)
+                }
+                
+                Section {
+                    Button("添加到行程") {
+                        addNewLocation()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(newLocationName.isEmpty ? Color.gray : Color.orange)
+                    .cornerRadius(8)
+                    .disabled(newLocationName.isEmpty)
+                }
+            }
+            .navigationTitle("添加地点")
+            .navigationBarItems(trailing: Button("取消") {
+                showingAddLocationSheet = false
+            })
+        }
+    }
+    
+    private func addNewLocation() {
+        guard let coordinate = tapLocation, !newLocationName.isEmpty else { return }
+        
+        let newLocation = Location(
+            name: newLocationName,
+            coordinate: coordinate,
+            type: newLocationType,
+            timeSpent: newLocationTime * 3600, // 转换为秒
+            openingHours: "9:00-20:00"
+        )
+        
+        // 如果之前没有路线，就创建一个新路线
+        if route.isEmpty {
+            route = [newLocation]
+        } else {
+            // 否则添加到现有路线
+            route.append(newLocation)
+            recalculateRouteStats()
+        }
+        
+        // 重置表单
+        newLocationName = ""
+        newLocationType = .attraction
+        newLocationTime = 1
+        showingAddLocationSheet = false
+    }
+    
+    private func iconForType(_ type: Location.LocationType) -> String {
+        switch type {
+        case .attraction: return "star.fill"
+        case .restaurant: return "fork.knife"
+        case .hotel: return "bed.double.fill"
+        case .transport: return "bus.fill"
+        }
+    }
+    
+    private func colorForType(_ type: Location.LocationType) -> Color {
+        switch type {
+        case .attraction: return .orange
+        case .restaurant: return .red
+        case .hotel: return .blue
+        case .transport: return .green
+        }
+    }
+    
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = Int(seconds) / 60 % 60
+        
+        if hours > 0 {
+            return "\(hours)小时\(minutes > 0 ? "\(minutes)分钟" : "")"
+        } else {
+            return "\(minutes)分钟"
+        }
+    }
+    
+    private func generateOptimalRoute() {
+        // 这里可以实现实际的路线优化算法
+        withAnimation {
+            switch optimizationMethod {
+            case 0: // 最短路径 - 简单地理排序
+                route = sampleLocations.sorted { location1, location2 in
+                    let startLocation = sampleLocations.first!
+                    let dist1 = calculateDistance(from: startLocation.coordinate, to: location1.coordinate)
+                    let dist2 = calculateDistance(from: startLocation.coordinate, to: location2.coordinate)
+                    return dist1 < dist2
+                }
+            case 1: // 最省时间 - 考虑停留时间最短优先
+                route = sampleLocations.sorted { $0.timeSpent < $1.timeSpent }
+            case 2: // 平衡模式 - 综合考虑距离和时间
+                route = sampleLocations.sorted { location1, location2 in
+                    let startLocation = sampleLocations.first!
+                    let dist1 = calculateDistance(from: startLocation.coordinate, to: location1.coordinate)
+                    let dist2 = calculateDistance(from: startLocation.coordinate, to: location2.coordinate)
+                    let timeFactor1 = location1.timeSpent / 3600 // 转换为小时
+                    let timeFactor2 = location2.timeSpent / 3600
+                    
+                    // 平衡距离和时间因素
+                    return (dist1 * timeFactor1) < (dist2 * timeFactor2)
+                }
+            default:
+                route = sampleLocations
+            }
+            
+            // 更新地图区域以显示所有位置
+            updateMapRegionToShowAllLocations()
+            
+            // 计算路线统计信息
+            recalculateRouteStats()
+        }
+    }
+    
+    private func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> CLLocationDistance {
+        let fromLocation = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLocation = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        return fromLocation.distance(from: toLocation)
+    }
+    
+    private func updateMapRegionToShowAllLocations() {
+        if let minLat = route.map({ $0.coordinate.latitude }).min(),
+           let maxLat = route.map({ $0.coordinate.latitude }).max(),
+           let minLon = route.map({ $0.coordinate.longitude }).min(),
+           let maxLon = route.map({ $0.coordinate.longitude }).max() {
+            
+            let center = CLLocationCoordinate2D(
+                latitude: (minLat + maxLat) / 2,
+                longitude: (minLon + maxLon) / 2
+            )
+            
+            let span = MKCoordinateSpan(
+                latitudeDelta: (maxLat - minLat) * 1.5,
+                longitudeDelta: (maxLon - minLon) * 1.5
+            )
+            
+            region = MKCoordinateRegion(center: center, span: span)
+        }
+    }
+    
+    private func recalculateRouteStats() {
+        // 计算总距离
+        totalDistance = 0
+        totalTravelTime = 0
+        
+        for i in 0..<route.count - 1 {
+            let distance = calculateDistance(from: route[i].coordinate, to: route[i+1].coordinate)
+            totalDistance += distance / 1000 // 转换为公里
+            
+            // 根据交通方式计算时间
+            // 假设步行速度为5km/h，其他交通方式基于speedFactor进行调整
+            let baseSpeedKmPerHour = 5.0
+            let adjustedSpeedKmPerHour = baseSpeedKmPerHour * selectedTravelMode.speedFactor
+            let timeHours = distance / 1000 / adjustedSpeedKmPerHour
+            totalTravelTime += timeHours * 3600 // 转换为秒
+        }
+    }
+    
+    private func resetRoute() {
+        withAnimation {
+            route = []
+            totalDistance = 0
+            totalTravelTime = 0
+            showingRouteStats = false
+            region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503),
+                span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+            )
+        }
+    }
+}
+
+struct RouteLineView: View {
+    let locations: [Location]
+    let travelMode: TravelMode
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // 路线
+                Path { path in
+                    guard let firstLocation = locations.first else { return }
+                    
+                    // 将第一个点转换为屏幕坐标
+                    let firstPoint = convertCoordinateToPoint(firstLocation.coordinate, in: geo.size)
+                    path.move(to: firstPoint)
+                    
+                    // 连接其余点
+                    for location in locations.dropFirst() {
+                        let point = convertCoordinateToPoint(location.coordinate, in: geo.size)
+                        path.addLine(to: point)
+                    }
+                }
+                .stroke(travelMode.color, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round, dash: travelMode.name == "步行" ? [5, 5] : []))
+                
+                // 路径上的交通方式图标
+                ForEach(0..<locations.count-1, id: \.self) { index in
+                    let startPoint = convertCoordinateToPoint(locations[index].coordinate, in: geo.size)
+                    let endPoint = convertCoordinateToPoint(locations[index+1].coordinate, in: geo.size)
+                    let midPoint = CGPoint(
+                        x: (startPoint.x + endPoint.x) / 2,
+                        y: (startPoint.y + endPoint.y) / 2
+                    )
+                    
+                    Image(systemName: travelMode.icon)
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(4)
+                        .background(Circle().fill(travelMode.color))
+                        .position(midPoint)
+                }
+            }
+        }
+    }
+    
+    private func convertCoordinateToPoint(_ coordinate: CLLocationCoordinate2D, in size: CGSize) -> CGPoint {
+        // 这只是一个简单的转换，实际应用中需要更复杂的方法
+        // 在这个简化示例中，我们假设经纬度可以线性映射到屏幕坐标
+        
+        let minLat = locations.map { $0.coordinate.latitude }.min() ?? 0
+        let maxLat = locations.map { $0.coordinate.latitude }.max() ?? 0
+        let minLon = locations.map { $0.coordinate.longitude }.min() ?? 0
+        let maxLon = locations.map { $0.coordinate.longitude }.max() ?? 0
+        
+        let latRange = maxLat - minLat
+        let lonRange = maxLon - minLon
+        
+        // 避免除以零
+        let normalizedLat = latRange > 0 ? (coordinate.latitude - minLat) / latRange : 0.5
+        let normalizedLon = lonRange > 0 ? (coordinate.longitude - minLon) / lonRange : 0.5
+        
+        return CGPoint(
+            x: size.width * normalizedLon,
+            y: size.height * (1 - normalizedLat) // 反转y轴，因为地图的北方在上方
+        )
+    }
+}
+
+struct LocationDetailView: View {
+    let location: Location
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 15) {
+                // 头部信息
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(location.name)
+                            .font(.title)
+                            .bold()
+                        
+                        HStack {
+                            Image(systemName: iconForType(location.type))
+                                .foregroundColor(colorForType(location.type))
+                            Text(typeString(location.type))
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    ZStack {
+                        Circle()
+                            .fill(colorForType(location.type).opacity(0.2))
+                            .frame(width: 70, height: 70)
+                        
+                        Image(systemName: iconForType(location.type))
+                            .font(.system(size: 30))
+                            .foregroundColor(colorForType(location.type))
+                    }
+                }
+                
+                Divider()
+                
+                // 基本信息
+                Group {
+                    HStack {
+                        Image(systemName: "clock")
+                            .frame(width: 25)
+                        Text("建议游玩时长：\(formatDuration(location.timeSpent))")
+                    }
+                    
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .frame(width: 25)
+                        Text("营业时间：\(location.openingHours)")
+                    }
+                    
+                    if !location.notes.isEmpty {
+                        HStack(alignment: .top) {
+                            Image(systemName: "note.text")
+                                .frame(width: 25)
+                            Text("备注：\(location.notes)")
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                // 功能按钮
+                HStack(spacing: 20) {
+                    Button(action: {
+                        // 打开地图应用导航
+                    }) {
+                        VStack {
+                            Image(systemName: "map.fill")
+                                .font(.title2)
+                                .foregroundColor(.blue)
+                            Text("导航")
+                                .font(.caption)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(10)
+                    }
+                    
+                    Button(action: {
+                        // 分享位置
+                    }) {
+                        VStack {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.title2)
+                                .foregroundColor(.green)
+                            Text("分享")
+                                .font(.caption)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(10)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+        }
+    }
+    
+    private func iconForType(_ type: Location.LocationType) -> String {
+        switch type {
+        case .attraction: return "star.fill"
+        case .restaurant: return "fork.knife"
+        case .hotel: return "bed.double.fill"
+        case .transport: return "bus.fill"
+        }
+    }
+    
+    private func colorForType(_ type: Location.LocationType) -> Color {
+        switch type {
+        case .attraction: return .orange
+        case .restaurant: return .red
+        case .hotel: return .blue
+        case .transport: return .green
+        }
+    }
+    
+    private func typeString(_ type: Location.LocationType) -> String {
+        switch type {
+        case .attraction: return "景点"
+        case .restaurant: return "餐厅"
+        case .hotel: return "住宿"
+        case .transport: return "交通"
+        }
+    }
+    
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = Int(seconds) / 60 % 60
+        
+        if hours > 0 {
+            return "\(hours)小时\(minutes > 0 ? "\(minutes)分钟" : "")"
+        } else {
+            return "\(minutes)分钟"
+        }
+    }
+}
+
+#Preview {
+    SmartTravelVisualizationSystem()
+} 

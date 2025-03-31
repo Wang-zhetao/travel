@@ -189,6 +189,8 @@ struct ExploreView: View {
                 ExploreRouteMapView()
             } else if category.name == "交通" {
                 TransportationView()
+            } else if category.name == "美食" {
+                FoodView()
             } else {
                 Text(category.name)
                     .navigationTitle(category.name)
@@ -954,4 +956,4 @@ struct InspirationDetailView: View {
 
 #Preview {
     ExploreView()
-} 
+}
